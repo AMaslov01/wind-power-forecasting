@@ -2,6 +2,8 @@
 
 A reproducible pipeline for hourly generation forecasting at the 90.09 MW Azov wind farm. This repository contains our hackathon solution for the Q1 evaluation period from **2026-01-01 to 2026-03-31**.
 
+> **Reproducibility scope:** this is a code release, not a standalone demo. The organizer datasets and generated model artifacts cannot be redistributed, so a fresh clone requires the files listed below before the end-to-end pipeline can run.
+
 ## Approach
 
 The final public solution uses a stable `V14 no-CDS` pipeline:
