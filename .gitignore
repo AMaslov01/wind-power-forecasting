@@ -1,11 +1,18 @@
 .DS_Store
 .venv/
+.env
+.env.*
 __pycache__/
 *.py[cod]
 .pytest_cache/
+*.pem
+*.key
 
 dataset/*.csv
+external_data/
 model_weights/
 outputs/
 submission/
+physics/*_results.json
+physics/oof_*.npz
 *.zip
