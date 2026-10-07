@@ -1,46 +1,59 @@
-# Почасовой прогноз выработки ветропарка
+# Physics-Informed Wind Farm Generation Forecasting
 
-Воспроизводимый почасовой прогноз выработки для Азовской ветроэлектростанции мощностью 90,09 МВт.
-Оцениваемый период Q1: **с 2026-01-01 по 2026-03-31**.
+A reproducible pipeline for hourly generation forecasting at the 90.09 MW Azov wind farm. This repository contains our hackathon solution for the Q1 evaluation period from **2026-01-01 to 2026-03-31**.
 
-## Быстрый старт
+## Approach
 
-Поместите официальные CSV-файлы хакатона в папку `dataset/`, оставьте поставляемую
-директорию `model_weights/` рядом с этим README, затем выполните:
+The final public solution uses a stable `V14 no-CDS` pipeline:
+
+- a physics-informed baseline derived from the Siemens Gamesa SG 3.4-132 turbine power curve;
+- public weather features from Open-Meteo/GFS, Meteostat cache, and NASA POWER when available;
+- 45 months of monthly renewable-energy context;
+- temporal Q1 backtests for 2023, 2024, and 2025;
+- CatBoost and HistGradientBoosting models combined with non-negative validation-optimized weights;
+- regime-specific HGB experts for different wind operating zones;
+- weather-dynamics features;
+- a guarded April-May 2026 actuals adapter whose Q1 correction is rejected automatically when validation constraints fail.
+
+The pipeline validates output shape, missing values, expected artifacts, and physical bounds. Forecasts outside `[0, 90.09]` MW are rejected.
+
+## Quick start
+
+Place the official hackathon CSV files in `dataset/`, keep the supplied `model_weights/` directory next to this README, and run:
 
 ```bash
 bash run_solution.sh
 ```
 
-Команда создаёт:
+The command creates:
 
 ```text
-outputs/predictions_q1.csv       # 2126 почасовых значений для оценки в лидерборде
-outputs/predictions_may18.csv    # 24 почасовых значения для 18.05.2026
-outputs/RUN_REPORT.json          # контрольные суммы, версии пакетов, статистика валидации
+outputs/predictions_q1.csv       # 2,126 hourly values for leaderboard evaluation
+outputs/predictions_may18.csv    # 24 hourly values for 2026-05-18
+outputs/RUN_REPORT.json          # checksums, package versions, validation statistics
 ```
 
-Для полной пересборки из исходных данных:
+To rebuild the full solution from source data:
 
 ```bash
 bash run_solution.sh --retrain
 ```
 
-Для исходной пересборки в стиле Colab/GPU:
+For a Colab/GPU-style rebuild:
 
 ```bash
 bash run_solution.sh --retrain --gpu
 ```
 
-Перед запуском чего-либо ресурсоёмкого проверяющие могут проверить пакет:
+To validate the package before running any expensive step:
 
 ```bash
 bash run_solution.sh --check-only
 ```
 
-## Требуемые локальные файлы
+## Required local files
 
-Исходные датасеты не добавлены в GitHub. Разместите их локально:
+The original datasets are not stored on GitHub. Place them locally as follows:
 
 ```text
 dataset/train_dataset.csv
@@ -51,47 +64,21 @@ model_weights/predictions_q1.csv
 model_weights/predictions_may18.csv
 ```
 
-Если `model_weights/` отсутствует, выполните `bash run_solution.sh --retrain`, чтобы пересобрать
-стабильный ансамбль V14 no-CDS и записать новый набор артефактов.
+If `model_weights/` is absent, run `bash run_solution.sh --retrain` to rebuild the stable V14 no-CDS ensemble and write a fresh artifact set.
 
-## Краткое описание модели
+The standard one-command path restores verified forecasts from the artifact bundle and uses only the Python standard library. The `--retrain` mode installs the complete ML dependencies, rebuilds the model from local datasets, rewrites `model_weights/`, and validates the resulting files.
 
-Финальное публичное решение — это стабильный пайплайн V14 no-CDS:
+## Output validation
 
-- физический бейзлайн на основе формы кривой мощности Siemens Gamesa SG 3.4-132;
-- внешние открытые погодные признаки из Open-Meteo/GFS, кэша Meteostat и NASA
-  POWER при наличии;
-- месячный контекст по ВИЭ от СО ЕЭС с консервативной политикой `legacy_best_gap`
-  на 45 месяцев;
-- временные Q1-бэктесты за 2023, 2024 и 2025 годы;
-- семейство CatBoost + HistGradientBoosting, объединённое с помощью неотрицательных
-  весов, оптимизированных на валидации;
-- режимные HGB-эксперты для рабочих зон ветра;
-- признаки погодной динамики;
-- защищённый адаптер фактических данных за апрель–май 2026: используется для операционного
-  прогноза May18, тогда как перенос на Q1 допускается только как небольшая скалярная
-  коррекция и автоматически отклоняется, если не проходят валидационные ограничения.
+`run_solution.sh` invokes `physics/validate_solution.py` and checks:
 
-Стандартный запуск одной командой восстанавливает проверенные прогнозы из набора
-артефактов и использует только стандартную библиотеку Python. Режим `--retrain`
-устанавливает полный набор ML-зависимостей, пересобирает модель из локальных датасетов,
-перезаписывает `model_weights/`, а затем валидирует выходные файлы.
+- Q1 forecast: one CSV column, exactly 2,126 rows, no NaNs, values within `[0, 90.09]`;
+- May 18 forecast: one CSV column, exactly 24 rows, no NaNs, values within `[0, 90.09]`;
+- required dataset files and expected row counts;
+- `ensemble_manifest.json` and both forecast snapshots in the artifact bundle.
 
-## Валидация выходных данных
+## Repository notes
 
-`run_solution.sh` вызывает `physics/validate_solution.py` и проверяет:
+Generated forecasts, model artifacts, local datasets, cache directories, and the final submission directory are intentionally excluded from Git. They belong in the hackathon ZIP/package rather than the public repository.
 
-- прогноз Q1: один столбец CSV, ровно 2126 строк, без NaN, значения в диапазоне `[0, 90.09]`;
-- прогноз May18: один столбец CSV, ровно 24 строки, без NaN, значения в диапазоне `[0, 90.09]`;
-- наличие обязательных файлов датасета и ожидаемое число строк;
-- наличие в наборе артефактов `ensemble_manifest.json` и обоих снимков прогнозов.
-
-## Заметки о репозитории
-
-Сгенерированные прогнозы, артефакты модели, локальные датасеты, директории кэша и
-финальная папка поставки намеренно исключены из Git. Они должны находиться в
-ZIP-архиве/пакете хакатона, а не в публичном репозитории.
-
-Опциональные хуки для внешних источников — Copernicus, Renewables Ninja и других
-исследовательских источников — остаются в коде для будущего расширения, но финальный
-запуск одной командой от них не зависит.
+Optional hooks for Copernicus, Renewables Ninja, and other research sources remain in the code for future work, but the final one-command pipeline does not depend on them.
