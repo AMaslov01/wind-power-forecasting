@@ -1,53 +1,64 @@
-# Physics-Informed Wind Farm Generation Forecasting
+# Physics-Informed Wind Power Forecasting
 
-A reproducible pipeline for hourly generation forecasting at the 90.09 MW Azov wind farm. This repository contains our hackathon solution for the Q1 evaluation period from **2026-01-01 to 2026-03-31**.
+A hackathon solution for hourly generation forecasting at the 90.09 MW Azov
+wind farm. The evaluation period covers **1 January-31 March 2026**.
 
-> **Reproducibility scope:** this is a code release, not a standalone demo. The organizer datasets and generated model artifacts cannot be redistributed, so a fresh clone requires the files listed below before the end-to-end pipeline can run.
+> This is a code release, not a standalone demo. The organizer data and trained
+> model artifacts cannot be redistributed, so a fresh clone cannot run
+> end-to-end without those local files.
 
 ## Approach
 
-The final public solution uses a stable `V14 no-CDS` pipeline:
+The final solution combines:
 
-- a physics-informed baseline derived from the Siemens Gamesa SG 3.4-132 turbine power curve;
-- public weather features from Open-Meteo/GFS, Meteostat cache, and NASA POWER when available;
-- 45 months of monthly renewable-energy context;
+- a physics-informed baseline derived from the Siemens Gamesa SG 3.4-132 power
+  curve;
+- public weather features from Open-Meteo/GFS, Meteostat, and NASA POWER when
+  available;
+- 45 months of regional renewable-energy context;
 - temporal Q1 backtests for 2023, 2024, and 2025;
-- CatBoost and HistGradientBoosting models combined with non-negative validation-optimized weights;
-- regime-specific HGB experts for different wind operating zones;
-- weather-dynamics features;
-- a guarded April-May 2026 actuals adapter whose Q1 correction is rejected automatically when validation constraints fail.
+- CatBoost and HistGradientBoosting models with non-negative,
+  validation-optimized blend weights;
+- specialist regressors for different wind operating zones;
+- a guarded 2026 calibration step whose correction is rejected when validation
+  constraints fail.
 
-The pipeline validates output shape, missing values, expected artifacts, and physical bounds. Forecasts outside `[0, 90.09]` MW are rejected.
+Predictions are checked for shape, missing values, and the physical range
+`[0, 90.09]` MW. See [`docs/method.md`](docs/method.md) for the technical
+summary.
 
-## Quick start
+## Running the code
 
-Place the official hackathon CSV files in `dataset/`, keep the supplied `model_weights/` directory next to this README, and run:
+The required private files are listed in
+[`dataset/README.md`](dataset/README.md).
+
+If you have both the organizer data and the trained artifact bundle, run:
 
 ```bash
 bash run_solution.sh
 ```
 
-The command creates:
+This restores and validates:
 
 ```text
-outputs/predictions_q1.csv       # 2,126 hourly values for leaderboard evaluation
-outputs/predictions_may18.csv    # 24 hourly values for 2026-05-18
-outputs/RUN_REPORT.json          # checksums, package versions, validation statistics
+outputs/predictions_q1.csv       # 2,126 hourly Q1 values
+outputs/predictions_may18.csv    # 24 hourly values for 18 May 2026
+outputs/RUN_REPORT.json          # checksums, versions, validation statistics
 ```
 
-To rebuild the full solution from source data:
+If you have the organizer data but not the artifact bundle, retrain the models:
 
 ```bash
 bash run_solution.sh --retrain
 ```
 
-For a Colab/GPU-style rebuild:
+GPU-enabled CatBoost training is available with:
 
 ```bash
 bash run_solution.sh --retrain --gpu
 ```
 
-To validate the package before running any expensive step:
+To validate the local data and artifact layout before an expensive run:
 
 ```bash
 bash run_solution.sh --check-only
@@ -55,7 +66,7 @@ bash run_solution.sh --check-only
 
 ## Required local files
 
-The original datasets are not stored on GitHub. Place them locally as follows:
+For inference from the original artifact bundle:
 
 ```text
 dataset/train_dataset.csv
@@ -66,21 +77,24 @@ model_weights/predictions_q1.csv
 model_weights/predictions_may18.csv
 ```
 
-If `model_weights/` is absent, run `bash run_solution.sh --retrain` to rebuild the stable V14 no-CDS ensemble and write a fresh artifact set.
-
-The standard one-command path restores verified forecasts from the artifact bundle and uses only the Python standard library. The `--retrain` mode installs the complete ML dependencies, rebuilds the model from local datasets, rewrites `model_weights/`, and validates the resulting files.
+`model_weights/` can be rebuilt with `bash run_solution.sh --retrain` when all
+three organizer files are available.
 
 ## Output validation
 
 `run_solution.sh` invokes `physics/validate_solution.py` and checks:
 
-- Q1 forecast: one CSV column, exactly 2,126 rows, no NaNs, values within `[0, 90.09]`;
-- May 18 forecast: one CSV column, exactly 24 rows, no NaNs, values within `[0, 90.09]`;
-- required dataset files and expected row counts;
-- `ensemble_manifest.json` and both forecast snapshots in the artifact bundle.
+- Q1 output: one CSV column, exactly 2,126 rows, no missing values;
+- 18 May output: one CSV column, exactly 24 rows, no missing values;
+- every prediction is within `[0, 90.09]` MW;
+- expected data files and artifact metadata are present.
 
-## Repository notes
+## Scope and limitations
 
-Generated forecasts, model artifacts, local datasets, cache directories, and the final submission directory are intentionally excluded from Git. They belong in the hackathon ZIP/package rather than the public repository.
+Generated forecasts, trained weights, organizer data, caches, and submission
+files are intentionally excluded from Git.
 
-Optional hooks for Copernicus, Renewables Ninja, and other research sources remain in the code for future work, but the final one-command pipeline does not depend on them.
+External weather archives may change after the competition, so a later retrain
+is not guaranteed to reproduce the original predictions byte-for-byte. Optional
+source adapters remain as research code and are not required by the documented
+final configuration.
